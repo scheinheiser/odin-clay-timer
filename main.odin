@@ -5,16 +5,7 @@ import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
 
-raylibFont :: struct {
-	fontId: u16,
-	font:   rl.Font,
-}
-
-raylibFonts := [10]raylibFont{}
-
-error_handler :: proc "c" (errorData: clay.ErrorData) {
-	//fmt.eprintf("[ERROR] Error Occurred: %v\n", errorData.Clay_String)
-}
+error_handler :: proc "c" (errorData: clay.ErrorData) {}
 
 measure_text :: proc "c" (
 	text: clay.StringSlice,
@@ -24,78 +15,101 @@ measure_text :: proc "c" (
 	return {width = f32(text.length * i32(config.fontSize)), height = f32(config.fontSize)}
 }
 
+clay_to_raylib_colour :: proc(clay_colour: clay.Color) -> rl.Color {
+	return rl.Color {
+		cast(u8)clay_colour.r,
+		cast(u8)clay_colour.g,
+		cast(u8)clay_colour.b,
+		cast(u8)clay_colour.a,
+	}
+}
+
 main :: proc() {
 	min_memory_size: u32 = clay.MinMemorySize()
 	memory := make([^]u8, min_memory_size)
 	arena: clay.Arena = clay.CreateArenaWithCapacityAndMemory(cast(uint)min_memory_size, memory)
 
-	clay.Initialize(arena, {width = 500, height = 500}, {handler = error_handler})
+	clay.Initialize(
+		arena,
+		{width = SCREEN_WIDTH, height = SCREEN_HEIGHT},
+		{handler = error_handler},
+	)
 	clay.SetMeasureTextFunction(measure_text, nil)
+	font: rl.Font = rl.LoadFont("resources/Aaargh.ttf")
+	defer rl.UnloadFont(font)
 
-	render_commands := create_layout()
+	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "oaxaca")
+	defer rl.CloseWindow()
+
+	render_commands := UI_create_layout()
+	for !rl.WindowShouldClose() {
+		clay.SetPointerState(
+			transmute(clay.Vector2)rl.GetMousePosition(),
+			rl.IsMouseButtonDown(.LEFT),
+		)
+
+		rl.BeginDrawing()
+		render_UI(font, &render_commands)
+		rl.EndDrawing()
+	}
+}
+
+render_UI :: proc(font: rl.Font, render_commands: ^clay.ClayArray(clay.RenderCommand)) {
 	for i in 0 ..< i32(render_commands.length) {
-		rc := clay.RenderCommandArray_Get(&render_commands, i)
-		boundingBox := rc.boundingBox
+		rc := clay.RenderCommandArray_Get(render_commands, i)
 
 		#partial switch rc.commandType {
+		case .None:
+			{}
 		case .Text:
 			config := rc.renderData.text
 
 			text := string(config.stringContents.chars[:config.stringContents.length])
 			cloned_string := strings.clone_to_cstring(text)
-			fontToUse: rl.Font = raylibFonts[config.fontId].font
 			rl.DrawTextEx(
-				fontToUse,
+				font,
 				cloned_string,
-				rl.Vector2{boundingBox.x, boundingBox.y},
+				rl.Vector2{cast(f32)rc.boundingBox.x, cast(f32)rc.boundingBox.y},
 				cast(f32)config.fontSize,
-				cast(f32)config.letterSpacing,
-				rl.Color {
-					cast(u8)config.textColor.r,
-					cast(u8)config.textColor.g,
-					cast(u8)config.textColor.b,
-					cast(u8)config.textColor.a,
-				},
+				cast(f32)config.letterSpacing + 10.00,
+				rl.BLACK,
 			)
 
 		case .Rectangle:
 			config := rc.renderData.rectangle
-			fmt.println("hi")
-			rl.DrawRectangle(
+			if config.cornerRadius.topRight > 0 {
+				rl.DrawRectangleRounded(
+					rl.Rectangle {
+						cast(f32)rc.boundingBox.x,
+						cast(f32)rc.boundingBox.y,
+						cast(f32)rc.boundingBox.width,
+						cast(f32)rc.boundingBox.height,
+					},
+					cast(f32)config.cornerRadius.topRight,
+					10,
+					clay_to_raylib_colour(config.backgroundColor),
+				)
+			} else {
+				rl.DrawRectangle(
+					cast(i32)rc.boundingBox.x,
+					cast(i32)rc.boundingBox.y,
+					cast(i32)rc.boundingBox.width,
+					cast(i32)rc.boundingBox.height,
+					clay_to_raylib_colour(config.backgroundColor),
+				)
+			}
+
+		case .ScissorStart:
+			config := rc.renderData.rectangle
+			rl.BeginScissorMode(
 				cast(i32)rc.boundingBox.x,
 				cast(i32)rc.boundingBox.y,
 				cast(i32)rc.boundingBox.width,
 				cast(i32)rc.boundingBox.height,
-				rl.Color {
-					cast(u8)config.backgroundColor.r,
-					cast(u8)config.backgroundColor.g,
-					cast(u8)config.backgroundColor.b,
-					cast(u8)config.backgroundColor.a,
-				},
 			)
+
+		case .ScissorEnd:
+			rl.EndScissorMode()
 		}
 	}
-}
-
-create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
-	clay.BeginLayout()
-
-	if clay.UI()(
-	{
-		id = clay.ID("outercontainer"),
-		layout = {
-			sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
-			childGap = 10,
-		},
-		backgroundColor = {250, 250, 250, 255},
-	},
-	) {
-		clay.Text(
-			"Hello World!",
-			clay.TextConfig({textColor = clay.Color{0, 0, 0, 0}, fontSize = 16}),
-		)
-	}
-
-	render_commands: clay.ClayArray(clay.RenderCommand) = clay.EndLayout()
-	return render_commands
 }
