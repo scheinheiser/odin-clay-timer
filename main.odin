@@ -28,6 +28,7 @@ main :: proc() {
 	min_memory_size: u32 = clay.MinMemorySize()
 	memory := make([^]u8, min_memory_size)
 	arena: clay.Arena = clay.CreateArenaWithCapacityAndMemory(cast(uint)min_memory_size, memory)
+	ctx: UI_ctx
 
 	clay.Initialize(
 		arena,
@@ -35,13 +36,15 @@ main :: proc() {
 		{handler = error_handler},
 	)
 	clay.SetMeasureTextFunction(measure_text, nil)
-	font: rl.Font = rl.LoadFont("resources/Aaargh.ttf")
-	defer rl.UnloadFont(font)
 
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "oaxaca")
 	defer rl.CloseWindow()
 
-	render_commands := UI_create_layout()
+	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 50, nil, 0)
+	defer rl.UnloadFont(font)
+	ctx.current_time = 0
+
+	render_commands := UI_create_layout(&ctx)
 	for !rl.WindowShouldClose() {
 		clay.SetPointerState(
 			transmute(clay.Vector2)rl.GetMousePosition(),
@@ -63,15 +66,15 @@ render_UI :: proc(font: rl.Font, render_commands: ^clay.ClayArray(clay.RenderCom
 			{}
 		case .Text:
 			config := rc.renderData.text
-
 			text := string(config.stringContents.chars[:config.stringContents.length])
 			cloned_string := strings.clone_to_cstring(text)
+
 			rl.DrawTextEx(
 				font,
 				cloned_string,
 				rl.Vector2{cast(f32)rc.boundingBox.x, cast(f32)rc.boundingBox.y},
 				cast(f32)config.fontSize,
-				cast(f32)config.letterSpacing + 10.00,
+				cast(f32)config.letterSpacing,
 				rl.BLACK,
 			)
 
