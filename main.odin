@@ -3,6 +3,7 @@ package main
 import clay "clay-odin"
 import "core:fmt"
 import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
 
 error_handler :: proc "c" (errorData: clay.ErrorData) {}
@@ -28,7 +29,7 @@ main :: proc() {
 	min_memory_size: u32 = clay.MinMemorySize()
 	memory := make([^]u8, min_memory_size)
 	arena: clay.Arena = clay.CreateArenaWithCapacityAndMemory(cast(uint)min_memory_size, memory)
-	ctx: UI_ctx
+	ctx: UI_manager
 
 	clay.Initialize(
 		arena,
@@ -36,6 +37,8 @@ main :: proc() {
 		{handler = error_handler},
 	)
 	clay.SetMeasureTextFunction(measure_text, nil)
+
+	rl.SetTargetFPS(60)
 
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "oaxaca")
 	defer rl.CloseWindow()
@@ -45,11 +48,25 @@ main :: proc() {
 	ctx.current_time = 0
 
 	render_commands := UI_create_layout(&ctx)
+	frame_counter := 0
+
+	fmt.printf("time -> %v\n", time.now())
+
 	for !rl.WindowShouldClose() {
 		clay.SetPointerState(
 			transmute(clay.Vector2)rl.GetMousePosition(),
 			rl.IsMouseButtonDown(.LEFT),
 		)
+
+		frame_counter += 1
+		if frame_counter > 60 do frame_counter = 0
+
+		if ctx.timer_state {
+			if frame_counter % 60 == 0 && frame_counter != 0 {
+				ctx.current_time += 1
+				render_commands = UI_create_layout(&ctx)
+			}
+		}
 
 		rl.BeginDrawing()
 		render_UI(font, &render_commands)

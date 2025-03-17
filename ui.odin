@@ -13,7 +13,7 @@ UI_FRAME_COLOUR :: clay.Color{188, 192, 194, 100}
 SCREEN_WIDTH :: 800
 SCREEN_HEIGHT :: 500
 
-UI_ctx :: struct {
+UI_manager :: struct {
 	current_time: i32,
 	timer_state:  bool,
 }
@@ -24,7 +24,7 @@ UI_button_interaction :: proc "c" (
 	userData: rawptr,
 ) {
 	context = runtime.default_context()
-	button_ctx := cast(^UI_ctx)userData
+	button_ctx := cast(^UI_manager)userData
 
 	if pointerInfo.state == clay.PointerDataInteractionState.PressedThisFrame {
 		str := strings.string_from_ptr(
@@ -42,13 +42,8 @@ UI_button_interaction :: proc "c" (
 	}
 }
 
-UI_create_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCommand) {
+UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand) {
 	clay.BeginLayout()
-
-	if ctx.timer_state {
-		ctx.current_time += 1
-		fmt.println("hi")
-	}
 
 	if clay.UI()(
 	{
