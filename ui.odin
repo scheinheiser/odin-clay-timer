@@ -16,6 +16,8 @@ SCREEN_HEIGHT :: 500
 UI_manager :: struct {
 	current_time: i32,
 	timer_state:  bool,
+	reset_time:   bool,
+	white_mode:   bool,
 }
 
 UI_button_interaction :: proc "c" (
@@ -24,7 +26,7 @@ UI_button_interaction :: proc "c" (
 	userData: rawptr,
 ) {
 	context = runtime.default_context()
-	button_ctx := cast(^UI_manager)userData
+	button_manager := cast(^UI_manager)userData
 
 	if pointerInfo.state == clay.PointerDataInteractionState.PressedThisFrame {
 		str := strings.string_from_ptr(
@@ -34,10 +36,14 @@ UI_button_interaction :: proc "c" (
 
 		switch str {
 		case "start_button":
-			button_ctx.timer_state = true
+			button_manager.timer_state = true
 
 		case "stop_button":
-			button_ctx.timer_state = false
+			button_manager.timer_state = false
+
+		case "reset_button":
+			button_manager.current_time = 0
+			button_manager.reset_time = true
 		}
 	}
 }
@@ -51,7 +57,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 		layout = {
 			sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
 			childGap = 5,
-			padding = clay.Padding{left = 5, bottom = 5, top = 5},
+			padding = clay.Padding{left = 5, bottom = 5, top = 5, right = 5},
 		},
 		backgroundColor = UI_BACKGROUND_COLOUR,
 	},
@@ -62,7 +68,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 			layout = {
 				layoutDirection = .TopToBottom,
 				sizing = {width = clay.SizingPercent(0.8), height = clay.SizingGrow({})},
-				childGap = 10,
+				childGap = 5,
 			},
 			backgroundColor = clay.Color{0, 0, 0, 0},
 		},
@@ -75,7 +81,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					padding = clay.Padding{left = 190, top = 110},
 				},
 				backgroundColor = UI_FRAME_COLOUR,
-				cornerRadius = clay.CornerRadiusAll(0.4),
+				cornerRadius = clay.CornerRadiusAll(0.3),
 			},
 			) {
 				hours: i32 = ctx.current_time / 3600
@@ -99,7 +105,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					childGap = 20,
 				},
 				backgroundColor = UI_FRAME_COLOUR,
-				cornerRadius = clay.CornerRadiusAll(0.4),
+				cornerRadius = clay.CornerRadiusAll(0.2),
 			},
 			) {
 				if clay.UI()(
@@ -137,6 +143,49 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 						clay.TextConfig({fontSize = 50, textColor = clay.Color{0, 0, 0, 0}}),
 					)
 				}
+			}
+		}
+
+		if clay.UI()(
+		{
+			id = clay.ID("display_swap_container"),
+			layout = {
+				layoutDirection = .TopToBottom,
+				sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
+				childGap = 235,
+				padding = clay.Padding{top = 20, bottom = 20},
+			},
+			backgroundColor = clay.Color{0, 0, 0, 0},
+			cornerRadius = clay.CornerRadiusAll(0.3),
+		},
+		) {
+			if clay.UI()(
+			{
+				id = clay.ID("display_swap_button"),
+				layout = {
+					sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.5)},
+				},
+				backgroundColor = clay.Color{0, 0, 0, 255},
+				cornerRadius = clay.CornerRadiusAll(0.3),
+			},
+			) {}
+
+			if clay.UI()(
+			{
+				id = clay.ID("reset_button"),
+				layout = {
+					sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.4)},
+					padding = clay.Padding{left = 40, top = 25},
+				},
+				backgroundColor = clay.Color{78, 82, 79, 255},
+				cornerRadius = clay.CornerRadiusAll(0.3),
+			},
+			) {
+				clay.OnHover(UI_button_interaction, ctx)
+				clay.Text(
+					"Reset",
+					clay.TextConfig({fontSize = 40, textColor = clay.Color{252, 255, 253, 255}}),
+				)
 			}
 		}
 	}

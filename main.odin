@@ -68,6 +68,11 @@ main :: proc() {
 			}
 		}
 
+		if ctx.reset_time {
+			render_commands = UI_create_layout(&ctx)
+			ctx.reset_time = false
+		}
+
 		rl.BeginDrawing()
 		render_UI(font, &render_commands)
 		rl.EndDrawing()
