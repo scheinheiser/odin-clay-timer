@@ -45,12 +45,18 @@ main :: proc() {
 
 	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 50, nil, 0)
 	defer rl.UnloadFont(font)
+
+	timer_image: rl.Image = rl.LoadImage("resources/timer_icon.png")
+	defer rl.UnloadImage(timer_image)
+
+	timer_icon := rl.LoadTextureFromImage(timer_image)
+	defer rl.UnloadTexture(timer_icon)
+	ctx.textures = [1]rl.Texture2D{timer_icon}
+
 	ctx.current_time = 0
 
 	render_commands := UI_create_layout(&ctx)
 	frame_counter := 0
-
-	fmt.printf("time -> %v\n", time.now())
 
 	for !rl.WindowShouldClose() {
 		clay.SetPointerState(
@@ -135,6 +141,24 @@ render_UI :: proc(font: rl.Font, render_commands: ^clay.ClayArray(clay.RenderCom
 
 		case .ScissorEnd:
 			rl.EndScissorMode()
+
+		case .Image:
+			config := rc.renderData.image
+			background_colour := config.backgroundColor
+			position_vec := rl.Vector2{rc.boundingBox.x, rc.boundingBox.y}
+
+			if config.backgroundColor.rgba == 0 {
+				background_colour = {255, 255, 255, 255}
+			}
+
+			image_texture := cast(^rl.Texture2D)config.imageData
+			rl.DrawTextureEx(
+				image_texture^,
+				position_vec,
+				0,
+				rc.boundingBox.width / cast(f32)config.sourceDimensions.width,
+				clay_to_raylib_colour(background_colour),
+			)
 		}
 	}
 }
