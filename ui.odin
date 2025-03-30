@@ -7,18 +7,21 @@ import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 
-UI_BACKGROUND_COLOUR :: clay.Color{57, 116, 153, 255}
-UI_FRAME_COLOUR :: clay.Color{188, 192, 194, 100}
+UI_WHITEMODE_BACKGROUND :: clay.Color{237, 235, 230, 255}
+UI_WHITEMODE_FRAME :: clay.Color{207, 204, 196, 100}
 
-SCREEN_WIDTH :: 800
-SCREEN_HEIGHT :: 500
+UI_DARKMODE_BACKGROUND :: clay.Color{77, 76, 74, 255}
+UI_DARKMODE_FRAME :: clay.Color{107, 106, 103, 100}
 
-UI_manager :: struct {
+SCREEN_WIDTH :: 600
+SCREEN_HEIGHT :: 400
+
+UI_ctx :: struct {
 	current_time: i32,
 	timer_state:  bool,
 	reset_time:   bool,
 	white_mode:   bool,
-	textures:     [1]rl.Texture2D,
+	textures:     [2]rl.Texture2D,
 }
 
 UI_button_interaction :: proc "c" (
@@ -27,29 +30,32 @@ UI_button_interaction :: proc "c" (
 	userData: rawptr,
 ) {
 	context = runtime.default_context()
-	button_manager := cast(^UI_manager)userData
+	button_ctx := cast(^UI_ctx)userData
 
 	if pointerInfo.state == clay.PointerDataInteractionState.PressedThisFrame {
-		str := strings.string_from_ptr(
+		button_id := strings.string_from_ptr(
 			elementId.stringId.chars,
 			cast(int)elementId.stringId.length,
 		)
 
-		switch str {
+		switch button_id {
 		case "start_button":
-			button_manager.timer_state = true
+			button_ctx.timer_state = true
 
 		case "stop_button":
-			button_manager.timer_state = false
+			button_ctx.timer_state = false
 
 		case "reset_button":
-			button_manager.current_time = 0
-			button_manager.reset_time = true
+			button_ctx.current_time = 0
+			button_ctx.reset_time = true
+
+		case "colour_swap_button":
+			button_ctx.white_mode = !button_ctx.white_mode
 		}
 	}
 }
 
-UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand) {
+UI_create_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCommand) {
 	clay.BeginLayout()
 
 	if clay.UI()(
@@ -60,7 +66,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 			childGap = 5,
 			padding = clay.Padding{left = 5, bottom = 5, top = 5, right = 5},
 		},
-		backgroundColor = UI_BACKGROUND_COLOUR,
+		backgroundColor = (ctx.white_mode ? UI_WHITEMODE_BACKGROUND : UI_DARKMODE_BACKGROUND),
 	},
 	) {
 		if clay.UI()(
@@ -81,40 +87,57 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					layoutDirection = .TopToBottom,
 					sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.65)},
 				},
-				backgroundColor = UI_FRAME_COLOUR,
+				backgroundColor = (ctx.white_mode ? UI_WHITEMODE_FRAME : UI_DARKMODE_FRAME),
 				cornerRadius = clay.CornerRadiusAll(0.3),
 			},
 			) {
-				hours: i32 = ctx.current_time / 3600
-				minutes: i32 = (ctx.current_time - (hours * 3600)) / 60
-				seconds: i32 = ctx.current_time - ((hours * 3600) + (minutes * 60))
+				hours := (ctx.current_time / 3600)
+				minutes := (ctx.current_time - (hours * 3600)) / 60
+				seconds := ctx.current_time - ((hours * 3600) + (minutes * 60))
 
-				time_str := fmt.tprintf("0%v:0%v:0%v", hours, minutes, seconds)
+				display_hours :=
+					fmt.tprintf("%v", hours) if hours >= 10 else fmt.tprintf("0%v", hours)
+				display_minutes :=
+					fmt.tprintf("%v", minutes) if minutes >= 10 else fmt.tprintf("0%v", minutes)
+				display_seconds :=
+					fmt.tprintf("%v", seconds) if seconds >= 10 else fmt.tprintf("0%v", seconds)
+
+				time_str := fmt.tprintf(
+					"%v:%v:%v",
+					display_hours,
+					display_minutes,
+					display_seconds,
+				)
 
 				if clay.UI()(
 				{
-					id = clay.ID("display_swap_container"),
+					id = clay.ID("background_swap_container"),
 					layout = {
 						childAlignment = {x = .Right},
-						sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.2)},
+						sizing = {width = clay.SizingFixed(10), height = clay.SizingFixed(10)},
 						padding = clay.Padding{right = 30},
+					},
+					image = {
+						imageData = (ctx.white_mode ? &ctx.textures[0] : &ctx.textures[1]),
+						sourceDimensions = {20, 20},
 					},
 				},
 				) {
 					if clay.UI()(
 					{
-						id = clay.ID("display_swap_button"),
+						id = clay.ID("colour_swap_button"),
 						layout = {
 							sizing = {
 								width = clay.SizingPercent(0.1),
 								height = clay.SizingGrow({}),
 							},
-							childAlignment = {x = .Right},
 						},
 						backgroundColor = clay.Color{100, 200, 0, 100},
 						cornerRadius = clay.CornerRadiusAll(0.3),
 					},
-					) {}
+					) {
+						clay.OnHover(UI_button_interaction, ctx)
+					}
 				}
 
 				if clay.UI()(
@@ -122,7 +145,10 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					id = clay.ID("timer_text_container"),
 					layout = {
 						sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
-						padding = clay.Padding{left = 250, top = 80},
+						padding = clay.Padding {
+							left = SCREEN_WIDTH * 0.3,
+							top = SCREEN_HEIGHT * 0.1,
+						},
 					},
 					cornerRadius = clay.CornerRadiusAll(0.3),
 				},
@@ -142,7 +168,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					padding = clay.PaddingAll(40),
 					childGap = 20,
 				},
-				backgroundColor = UI_FRAME_COLOUR,
+				backgroundColor = (ctx.white_mode ? UI_WHITEMODE_FRAME : UI_DARKMODE_FRAME),
 				cornerRadius = clay.CornerRadiusAll(0.2),
 			},
 			) {
@@ -151,7 +177,10 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					id = clay.ID("start_button"),
 					layout = {
 						sizing = {width = clay.SizingPercent(0.33), height = clay.SizingGrow({})},
-						padding = clay.Padding{left = 60, right = 40, top = 40, bottom = 40},
+						padding = clay.Padding {
+							left = SCREEN_WIDTH * 0.08,
+							top = SCREEN_HEIGHT * 0.02,
+						},
 					},
 					backgroundColor = clay.Color{85, 201, 116, 255},
 					cornerRadius = clay.CornerRadiusAll(0.3),
@@ -169,7 +198,10 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					id = clay.ID("stop_button"),
 					layout = {
 						sizing = {width = clay.SizingPercent(0.33), height = clay.SizingGrow({})},
-						padding = clay.Padding{left = 80, right = 40, top = 20, bottom = 40},
+						padding = clay.Padding {
+							left = SCREEN_WIDTH * 0.08,
+							top = SCREEN_HEIGHT * 0.02,
+						},
 					},
 					backgroundColor = clay.Color{199, 30, 30, 255},
 					cornerRadius = clay.CornerRadiusAll(0.3),
@@ -178,7 +210,7 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					clay.OnHover(UI_button_interaction, ctx)
 					clay.Text(
 						"Stop",
-						clay.TextConfig({fontSize = 50, textColor = clay.Color{0, 0, 0, 0}}),
+						clay.TextConfig({fontSize = 40, textColor = clay.Color{0, 0, 0, 0}}),
 					)
 				}
 
@@ -187,7 +219,10 @@ UI_create_layout :: proc(ctx: ^UI_manager) -> clay.ClayArray(clay.RenderCommand)
 					id = clay.ID("reset_button"),
 					layout = {
 						sizing = {width = clay.SizingPercent(0.33), height = clay.SizingGrow({})},
-						padding = clay.Padding{left = 40, top = 25},
+						padding = clay.Padding {
+							left = SCREEN_WIDTH * 0.08,
+							top = SCREEN_HEIGHT * 0.02,
+						},
 					},
 					backgroundColor = clay.Color{78, 82, 79, 255},
 					cornerRadius = clay.CornerRadiusAll(0.3),

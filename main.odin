@@ -29,7 +29,7 @@ main :: proc() {
 	min_memory_size: u32 = clay.MinMemorySize()
 	memory := make([^]u8, min_memory_size)
 	arena: clay.Arena = clay.CreateArenaWithCapacityAndMemory(cast(uint)min_memory_size, memory)
-	ctx: UI_manager
+	ctx: UI_ctx
 
 	clay.Initialize(
 		arena,
@@ -46,17 +46,28 @@ main :: proc() {
 	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 50, nil, 0)
 	defer rl.UnloadFont(font)
 
-	timer_image: rl.Image = rl.LoadImage("resources/timer_icon.png")
-	defer rl.UnloadImage(timer_image)
+	darkmode_image: rl.Image = rl.LoadImage("resources/moon_icon.png")
+	whitemode_image: rl.Image = rl.LoadImage("resources/sun_icon.png")
+	defer {
+		rl.UnloadImage(darkmode_image)
+		rl.UnloadImage(whitemode_image)
+	}
 
-	timer_icon := rl.LoadTextureFromImage(timer_image)
-	defer rl.UnloadTexture(timer_icon)
-	ctx.textures = [1]rl.Texture2D{timer_icon}
+	darkmode_icon := rl.LoadTextureFromImage(darkmode_image)
+	whitemode_icon := rl.LoadTextureFromImage(whitemode_image)
+	defer {
+		rl.UnloadTexture(darkmode_icon)
+		rl.UnloadTexture(whitemode_icon)
+	}
+
+	ctx.textures = [2]rl.Texture2D{darkmode_icon, whitemode_icon}
 
 	ctx.current_time = 0
+	ctx.white_mode = true
 
 	render_commands := UI_create_layout(&ctx)
 	frame_counter := 0
+	curr_mode := ctx.white_mode
 
 	for !rl.WindowShouldClose() {
 		clay.SetPointerState(
@@ -72,6 +83,12 @@ main :: proc() {
 				ctx.current_time += 1
 				render_commands = UI_create_layout(&ctx)
 			}
+		}
+
+		if ctx.white_mode != curr_mode {
+			fmt.println("hi")
+			curr_mode = ctx.white_mode
+			render_commands = UI_create_layout(&ctx)
 		}
 
 		if ctx.reset_time {
