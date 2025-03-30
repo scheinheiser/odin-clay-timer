@@ -1,9 +1,8 @@
-package main
+package clock_app
 
 import clay "clay-odin"
 import "core:fmt"
 import "core:strings"
-import "core:time"
 import rl "vendor:raylib"
 
 error_handler :: proc "c" (errorData: clay.ErrorData) {}
@@ -39,33 +38,34 @@ main :: proc() {
 	clay.SetMeasureTextFunction(measure_text, nil)
 
 	rl.SetTargetFPS(60)
-
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "oaxaca")
-	defer rl.CloseWindow()
 
-	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 50, nil, 0)
-	defer rl.UnloadFont(font)
+	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 100, nil, 0)
 
 	darkmode_image: rl.Image = rl.LoadImage("resources/moon_icon.png")
 	whitemode_image: rl.Image = rl.LoadImage("resources/sun_icon.png")
-	defer {
-		rl.UnloadImage(darkmode_image)
-		rl.UnloadImage(whitemode_image)
-	}
 
 	darkmode_icon := rl.LoadTextureFromImage(darkmode_image)
 	whitemode_icon := rl.LoadTextureFromImage(whitemode_image)
+
 	defer {
+		rl.CloseWindow()
+
+		rl.UnloadFont(font)
+		rl.UnloadImage(darkmode_image)
+		rl.UnloadImage(whitemode_image)
+
 		rl.UnloadTexture(darkmode_icon)
 		rl.UnloadTexture(whitemode_icon)
 	}
 
 	ctx.textures = [2]rl.Texture2D{darkmode_icon, whitemode_icon}
-
 	ctx.current_time = 0
 	ctx.white_mode = true
+	ctx.current_screen = UI_state.TIMER
 
-	render_commands := UI_create_layout(&ctx)
+	render_commands :=
+		ctx.current_screen == .STOPWATCH ? UI_create_stopwatch_layout(&ctx) : UI_create_timer_layout(&ctx)
 	frame_counter := 0
 	curr_mode := ctx.white_mode
 
@@ -78,22 +78,30 @@ main :: proc() {
 		frame_counter += 1
 		if frame_counter > 60 do frame_counter = 0
 
-		if ctx.timer_state {
-			if frame_counter % 60 == 0 && frame_counter != 0 {
-				ctx.current_time += 1
-				render_commands = UI_create_layout(&ctx)
+		switch ctx.current_screen {
+		case .STOPWATCH:
+			if ctx.start_stopwatch {
+				if frame_counter % 60 == 0 && frame_counter != 0 {
+					ctx.current_time += 1
+					render_commands = UI_create_stopwatch_layout(&ctx)
+				}
 			}
-		}
 
-		if ctx.white_mode != curr_mode {
-			fmt.println("hi")
-			curr_mode = ctx.white_mode
-			render_commands = UI_create_layout(&ctx)
-		}
+			if ctx.white_mode != curr_mode {
+				curr_mode = ctx.white_mode
+				render_commands = UI_create_stopwatch_layout(&ctx)
+			}
 
-		if ctx.reset_time {
-			render_commands = UI_create_layout(&ctx)
-			ctx.reset_time = false
+			if ctx.reset_time {
+				render_commands = UI_create_stopwatch_layout(&ctx)
+				ctx.reset_time = false
+			}
+
+		case .TIMER:
+			if ctx.timer_changed {
+				render_commands = UI_create_timer_layout(&ctx)
+				ctx.timer_changed = false
+			}
 		}
 
 		rl.BeginDrawing()
