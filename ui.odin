@@ -23,10 +23,9 @@ UI_state :: enum {
 UI_ctx :: struct {
 	current_screen:  UI_state,
 	current_time:    i32,
-	timer_changed:   bool,
 	start_stopwatch: bool,
 	start_timer:     bool,
-	reset_time:      bool,
+	reset_stopwatch: bool,
 	white_mode:      bool,
 	textures:        [2]rl.Texture2D,
 }
@@ -47,15 +46,15 @@ UI_button_interaction :: proc "c" (
 
 		switch button_id {
 		// stopwatch buttons
-		case "start_button":
+		case "start_stopwatch_button":
 			button_ctx.start_stopwatch = true
 
-		case "stop_button":
+		case "stop_stopwatch_button":
 			button_ctx.start_stopwatch = false
 
 		case "reset_button":
 			button_ctx.current_time = 0
-			button_ctx.reset_time = true
+			button_ctx.reset_stopwatch = true
 
 		case "colour_swap_button":
 			button_ctx.white_mode = !button_ctx.white_mode
@@ -63,23 +62,50 @@ UI_button_interaction :: proc "c" (
 		// timer buttons
 		case "big_pos_inc":
 			button_ctx.current_time += 60
-			button_ctx.timer_changed = true
 
 		case "big_neg_dec":
 			button_ctx.current_time -= 60
 			if button_ctx.current_time < 0 do button_ctx.current_time = 0
-			button_ctx.timer_changed = true
 
 		case "small_pos_inc":
 			button_ctx.current_time += 30
-			button_ctx.timer_changed = true
 
 		case "small_neg_dec":
 			button_ctx.current_time -= 30
 			if button_ctx.current_time < 0 do button_ctx.current_time = 0
-			button_ctx.timer_changed = true
+
+		case "start_timer_button":
+			button_ctx.start_timer = true
+
+		case "pause_timer_button":
+			button_ctx.start_timer = false
+
+		// timer shortcuts
+		case "ten_mins":
+			button_ctx.current_time = 600
+
+		case "five_mins":
+			button_ctx.current_time = 300
+
+		case "three_mins":
+			button_ctx.current_time = 180
+
+		case "one_min":
+			button_ctx.current_time = 60
 		}
 	}
+}
+
+_UI_format_time :: proc(ctx: ^UI_ctx) -> string {
+	hours := (ctx.current_time / 3600)
+	minutes := (ctx.current_time - (hours * 3600)) / 60
+	seconds := ctx.current_time - ((hours * 3600) + (minutes * 60))
+
+	display_hours := fmt.tprintf("%v", hours) if hours >= 10 else fmt.tprintf("0%v", hours)
+	display_minutes := fmt.tprintf("%v", minutes) if minutes >= 10 else fmt.tprintf("0%v", minutes)
+	display_seconds := fmt.tprintf("%v", seconds) if seconds >= 10 else fmt.tprintf("0%v", seconds)
+
+	return fmt.tprintf("%v:%v:%v", display_hours, display_minutes, display_seconds)
 }
 
 UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCommand) {
@@ -118,24 +144,6 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 				cornerRadius = clay.CornerRadiusAll(0.3),
 			},
 			) {
-				hours := (ctx.current_time / 3600)
-				minutes := (ctx.current_time - (hours * 3600)) / 60
-				seconds := ctx.current_time - ((hours * 3600) + (minutes * 60))
-
-				display_hours :=
-					fmt.tprintf("%v", hours) if hours >= 10 else fmt.tprintf("0%v", hours)
-				display_minutes :=
-					fmt.tprintf("%v", minutes) if minutes >= 10 else fmt.tprintf("0%v", minutes)
-				display_seconds :=
-					fmt.tprintf("%v", seconds) if seconds >= 10 else fmt.tprintf("0%v", seconds)
-
-				time_str := fmt.tprintf(
-					"%v:%v:%v",
-					display_hours,
-					display_minutes,
-					display_seconds,
-				)
-
 				if clay.UI()(
 				{
 					id = clay.ID("colour_swap_button"),
@@ -168,7 +176,7 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 				},
 				) {
 					clay.Text(
-						time_str,
+						_UI_format_time(ctx),
 						clay.TextConfig({fontSize = 100, textColor = clay.Color{0, 0, 0, 0}}),
 					)
 				}
@@ -188,7 +196,7 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 			) {
 				if clay.UI()(
 				{
-					id = clay.ID("start_button"),
+					id = clay.ID("start_stopwatch_button"),
 					layout = {
 						sizing = {width = clay.SizingPercent(0.33), height = clay.SizingGrow({})},
 						padding = clay.Padding {
@@ -209,7 +217,7 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 
 				if clay.UI()(
 				{
-					id = clay.ID("stop_button"),
+					id = clay.ID("stop_stopwatch_button"),
 					layout = {
 						sizing = {width = clay.SizingPercent(0.33), height = clay.SizingGrow({})},
 						padding = clay.Padding {
@@ -238,7 +246,7 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 							top = SCREEN_HEIGHT * 0.02,
 						},
 					},
-					backgroundColor = clay.Color{78, 82, 79, 255},
+					backgroundColor = clay.Color{138, 137, 135, 255},
 					cornerRadius = clay.CornerRadiusAll(0.3),
 				},
 				) {
@@ -259,10 +267,16 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 }
 
 _UI_timer_shortcut_button :: proc(ctx: ^UI_ctx, id, length: string) {
+	padding := 0.03 if length != "Three Minutes" else 0.02
+
 	if clay.UI()(
 	{
 		id = clay.ID(id),
-		layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.18)}},
+		layout = {
+			sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.15)},
+			padding = clay.Padding{left = cast(u16)(SCREEN_WIDTH * padding)},
+			childAlignment = {y = .Center},
+		},
 		backgroundColor = clay.Color{138, 137, 135, 255},
 		cornerRadius = clay.CornerRadiusAll(0.3),
 	},
@@ -270,7 +284,9 @@ _UI_timer_shortcut_button :: proc(ctx: ^UI_ctx, id, length: string) {
 		clay.OnHover(UI_button_interaction, ctx)
 		clay.Text(
 			length,
-			clay.TextConfig({fontSize = 20, textColor = clay.Color{252, 255, 253, 255}}),
+			clay.TextConfig(
+				{fontSize = 25, textColor = clay.Color{252, 255, 253, 255}, wrapMode = .None},
+			),
 		)
 	}
 }
@@ -312,24 +328,6 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 				cornerRadius = clay.CornerRadiusAll(0.3),
 			},
 			) {
-				hours := (ctx.current_time / 3600)
-				minutes := (ctx.current_time - (hours * 3600)) / 60
-				seconds := ctx.current_time - ((hours * 3600) + (minutes * 60))
-
-				display_hours :=
-					fmt.tprintf("%v", hours) if hours >= 10 else fmt.tprintf("0%v", hours)
-				display_minutes :=
-					fmt.tprintf("%v", minutes) if minutes >= 10 else fmt.tprintf("0%v", minutes)
-				display_seconds :=
-					fmt.tprintf("%v", seconds) if seconds >= 10 else fmt.tprintf("0%v", seconds)
-
-				time_str := fmt.tprintf(
-					"%v:%v:%v",
-					display_hours,
-					display_minutes,
-					display_seconds,
-				)
-
 				if clay.UI()(
 				{
 					id = clay.ID("timer_text_container"),
@@ -344,7 +342,7 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 				},
 				) {
 					clay.Text(
-						time_str,
+						_UI_format_time(ctx),
 						clay.TextConfig({fontSize = 100, textColor = clay.Color{0, 0, 0, 0}}),
 					)
 				}
@@ -367,12 +365,24 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 								width = clay.SizingPercent(0.40),
 								height = clay.SizingGrow({}),
 							},
+							childAlignment = {y = .Center},
+							padding = clay.Padding{left = SCREEN_WIDTH * 0.06},
 						},
 						backgroundColor = clay.Color{85, 201, 116, 255},
 						cornerRadius = clay.CornerRadiusAll(0.4),
 					},
 					) {
 						clay.OnHover(UI_button_interaction, ctx)
+						clay.Text(
+							"+ 1 min",
+							clay.TextConfig(
+								{
+									fontSize = 45,
+									textColor = clay.Color{0, 0, 0, 255},
+									wrapMode = .None,
+								},
+							),
+						)
 					}
 
 					if clay.UI()(
@@ -383,12 +393,24 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 								width = clay.SizingPercent(0.40),
 								height = clay.SizingGrow({}),
 							},
+							childAlignment = {y = .Center},
+							padding = clay.Padding{left = SCREEN_WIDTH * 0.06},
 						},
 						backgroundColor = clay.Color{199, 30, 30, 255},
 						cornerRadius = clay.CornerRadiusAll(0.4),
 					},
 					) {
 						clay.OnHover(UI_button_interaction, ctx)
+						clay.Text(
+							"- 1 min",
+							clay.TextConfig(
+								{
+									fontSize = 45,
+									textColor = clay.Color{0, 0, 0, 255},
+									wrapMode = .None,
+								},
+							),
+						)
 					}
 				}
 
@@ -410,12 +432,24 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 								width = clay.SizingPercent(0.30),
 								height = clay.SizingGrow({}),
 							},
+							childAlignment = {y = .Center},
+							padding = clay.Padding{left = SCREEN_WIDTH * 0.05},
 						},
 						backgroundColor = clay.Color{85, 201, 116, 255},
 						cornerRadius = clay.CornerRadiusAll(0.5),
 					},
 					) {
 						clay.OnHover(UI_button_interaction, ctx)
+						clay.Text(
+							"+ 30s",
+							clay.TextConfig(
+								{
+									fontSize = 40,
+									textColor = clay.Color{0, 0, 0, 255},
+									wrapMode = .None,
+								},
+							),
+						)
 					}
 
 					if clay.UI()(
@@ -426,12 +460,24 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 								width = clay.SizingPercent(0.30),
 								height = clay.SizingGrow({}),
 							},
+							childAlignment = {y = .Center},
+							padding = clay.Padding{left = SCREEN_WIDTH * 0.05},
 						},
 						backgroundColor = clay.Color{199, 30, 30, 255},
 						cornerRadius = clay.CornerRadiusAll(0.5),
 					},
 					) {
 						clay.OnHover(UI_button_interaction, ctx)
+						clay.Text(
+							"- 30s",
+							clay.TextConfig(
+								{
+									fontSize = 40,
+									textColor = clay.Color{0, 0, 0, 255},
+									wrapMode = .None,
+								},
+							),
+						)
 					}
 				}
 			}
@@ -449,8 +495,6 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 			cornerRadius = clay.CornerRadiusAll(0.3),
 		},
 		) {
-			// notes for another time; convenient times are 10, 5, 3 and 1 minute(s)
-			// this'll also have the start button, so 5 buttons in total.
 			shortcut_list := [4]string {
 				"Ten Minutes",
 				"Five Minutes",
@@ -461,6 +505,44 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 
 			for shortcut_name, i in shortcut_list {
 				_UI_timer_shortcut_button(ctx, shortcut_ids[i], shortcut_name)
+			}
+
+			if clay.UI()(
+			{
+				id = clay.ID("start_timer_button"),
+				layout = {
+					sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.2)},
+					padding = clay.Padding{left = SCREEN_WIDTH * 0.06},
+					childAlignment = {y = .Center},
+				},
+				backgroundColor = clay.Color{85, 201, 116, 255},
+				cornerRadius = clay.CornerRadiusAll(0.3),
+			},
+			) {
+				clay.OnHover(UI_button_interaction, ctx)
+				clay.Text(
+					"Start",
+					clay.TextConfig({fontSize = 40, textColor = clay.Color{252, 255, 253, 255}}),
+				)
+			}
+
+			if clay.UI()(
+			{
+				id = clay.ID("pause_timer_button"),
+				layout = {
+					sizing = {width = clay.SizingGrow({}), height = clay.SizingPercent(0.2)},
+					padding = clay.Padding{left = SCREEN_WIDTH * 0.05},
+					childAlignment = {y = .Center},
+				},
+				backgroundColor = clay.Color{199, 30, 30, 255},
+				cornerRadius = clay.CornerRadiusAll(0.3),
+			},
+			) {
+				clay.OnHover(UI_button_interaction, ctx)
+				clay.Text(
+					"Pause",
+					clay.TextConfig({fontSize = 40, textColor = clay.Color{252, 255, 253, 255}}),
+				)
 			}
 		}
 	}

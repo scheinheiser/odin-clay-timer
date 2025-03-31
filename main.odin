@@ -1,11 +1,20 @@
 package clock_app
 
+import "base:runtime"
 import clay "clay-odin"
 import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
 
-error_handler :: proc "c" (errorData: clay.ErrorData) {}
+error_handler :: proc "c" (errorData: clay.ErrorData) {
+	context = runtime.default_context()
+	error_text := strings.string_from_ptr(
+		errorData.errorText.chars,
+		cast(int)errorData.errorText.length,
+	)
+
+	fmt.eprintfln("A Clay Error was detected: %v", error_text)
+}
 
 measure_text :: proc "c" (
 	text: clay.StringSlice,
@@ -40,7 +49,7 @@ main :: proc() {
 	rl.SetTargetFPS(60)
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "oaxaca")
 
-	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 100, nil, 0)
+	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 200, nil, 0)
 
 	darkmode_image: rl.Image = rl.LoadImage("resources/moon_icon.png")
 	whitemode_image: rl.Image = rl.LoadImage("resources/sun_icon.png")
@@ -68,12 +77,27 @@ main :: proc() {
 		ctx.current_screen == .STOPWATCH ? UI_create_stopwatch_layout(&ctx) : UI_create_timer_layout(&ctx)
 	frame_counter := 0
 	curr_mode := ctx.white_mode
+	curr_time := ctx.current_time
 
 	for !rl.WindowShouldClose() {
 		clay.SetPointerState(
 			transmute(clay.Vector2)rl.GetMousePosition(),
 			rl.IsMouseButtonDown(.LEFT),
 		)
+
+		if rl.IsKeyPressed(rl.KeyboardKey.S) {
+			switch ctx.current_screen {
+			case .STOPWATCH:
+				ctx.current_screen = .TIMER
+				ctx.current_time = 0
+				render_commands = UI_create_timer_layout(&ctx)
+
+			case .TIMER:
+				ctx.current_screen = .STOPWATCH
+				ctx.current_time = 0
+				render_commands = UI_create_stopwatch_layout(&ctx)
+			}
+		}
 
 		frame_counter += 1
 		if frame_counter > 60 do frame_counter = 0
@@ -92,15 +116,22 @@ main :: proc() {
 				render_commands = UI_create_stopwatch_layout(&ctx)
 			}
 
-			if ctx.reset_time {
+			if ctx.reset_stopwatch {
 				render_commands = UI_create_stopwatch_layout(&ctx)
-				ctx.reset_time = false
+				ctx.reset_stopwatch = false
 			}
 
 		case .TIMER:
-			if ctx.timer_changed {
+			if ctx.start_timer {
+				if frame_counter % 60 == 0 && frame_counter != 0 {
+					ctx.current_time -= 1
+					render_commands = UI_create_timer_layout(&ctx)
+				}
+			}
+
+			if ctx.current_time != curr_time {
 				render_commands = UI_create_timer_layout(&ctx)
-				ctx.timer_changed = false
+				curr_time = ctx.current_time
 			}
 		}
 
