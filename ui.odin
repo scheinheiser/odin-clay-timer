@@ -6,11 +6,13 @@ import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
 
-UI_WHITEMODE_BACKGROUND :: clay.Color{237, 235, 230, 255}
-UI_WHITEMODE_FRAME :: clay.Color{171, 179, 173, 100}
+UI_WHITEMODE_BACKGROUND :: clay.Color{240, 240, 240, 255}
+UI_WHITEMODE_FRAME :: clay.Color{220, 220, 220, 255}
+UI_WHITEMODE_TEXTCOLOUR :: clay.Color{0, 0, 0, 255}
 
-UI_DARKMODE_BACKGROUND :: clay.Color{77, 76, 74, 255}
-UI_DARKMODE_FRAME :: clay.Color{107, 106, 103, 100}
+UI_DARKMODE_BACKGROUND :: clay.Color{18, 18, 18, 255}
+UI_DARKMODE_FRAME :: clay.Color{64, 64, 64, 255}
+UI_DARKMODE_TEXTCOLOUR :: clay.Color{255, 255, 255, 255}
 
 SCREEN_WIDTH :: 600
 SCREEN_HEIGHT :: 400
@@ -204,7 +206,7 @@ UI_create_stopwatch_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderCo
 							top = SCREEN_HEIGHT * 0.02,
 						},
 					},
-					backgroundColor = clay.Color{85, 201, 116, 255},
+					backgroundColor = clay.Color{26, 150, 24, 255},
 					cornerRadius = clay.CornerRadiusAll(0.3),
 				},
 				) {
@@ -277,7 +279,7 @@ _UI_timer_shortcut_button :: proc(ctx: ^UI_ctx, id, length: string) {
 			padding = clay.Padding{left = cast(u16)(SCREEN_WIDTH * padding)},
 			childAlignment = {y = .Center},
 		},
-		backgroundColor = clay.Color{138, 137, 135, 255},
+		backgroundColor = clay.Color{180, 180, 180, 255},
 		cornerRadius = clay.CornerRadiusAll(0.3),
 	},
 	) {
@@ -515,7 +517,7 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 					padding = clay.Padding{left = SCREEN_WIDTH * 0.06},
 					childAlignment = {y = .Center},
 				},
-				backgroundColor = clay.Color{85, 201, 116, 255},
+				backgroundColor = clay.Color{26, 150, 24, 255},
 				cornerRadius = clay.CornerRadiusAll(0.3),
 			},
 			) {
@@ -534,7 +536,7 @@ UI_create_timer_layout :: proc(ctx: ^UI_ctx) -> clay.ClayArray(clay.RenderComman
 					padding = clay.Padding{left = SCREEN_WIDTH * 0.05},
 					childAlignment = {y = .Center},
 				},
-				backgroundColor = clay.Color{199, 30, 30, 255},
+				backgroundColor = clay.Color{181, 30, 27, 255},
 				cornerRadius = clay.CornerRadiusAll(0.3),
 			},
 			) {

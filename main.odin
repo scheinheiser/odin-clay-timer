@@ -47,7 +47,7 @@ main :: proc() {
 	clay.SetMeasureTextFunction(measure_text, nil)
 
 	rl.SetTargetFPS(60)
-	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "oaxaca")
+	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Odin Timer")
 
 	font: rl.Font = rl.LoadFontEx("resources/OpenSans_SemiCondensed-Medium.ttf", 200, nil, 0)
 
@@ -71,7 +71,7 @@ main :: proc() {
 	ctx.textures = [2]rl.Texture2D{darkmode_icon, whitemode_icon}
 	ctx.current_time = 0
 	ctx.white_mode = true
-	ctx.current_screen = UI_state.TIMER
+	ctx.current_screen = UI_state.STOPWATCH
 
 	render_commands :=
 		ctx.current_screen == .STOPWATCH ? UI_create_stopwatch_layout(&ctx) : UI_create_timer_layout(&ctx)
