@@ -5,7 +5,7 @@ To download the project files, run:
 ```
 git clone https://github.com/scheinheiser/odin-clay-timer
 ```
-Enter the director and build the files with this:
+Enter the directory and build the files with this:
 ```
 odin build . -o:speed
 ```
